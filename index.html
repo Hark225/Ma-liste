@@ -1,0 +1,840 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ma Liste de Courses</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0f0e0c;
+    --surface: #1a1916;
+    --card: #222018;
+    --border: #2e2b24;
+    --accent: #e8c547;
+    --accent2: #d4a843;
+    --text: #f0ead8;
+    --muted: #8a8270;
+    --danger: #e05c5c;
+    --success: #5cb87a;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+    padding: 0 0 80px;
+  }
+
+  /* ---- HEADER ---- */
+  header {
+    background: linear-gradient(135deg, #1a1811 0%, #0f0e0c 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 22px 20px 18px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  header h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.5rem;
+    color: var(--accent);
+    letter-spacing: -.5px;
+  }
+  header span {
+    font-size: .75rem;
+    color: var(--muted);
+    background: var(--card);
+    border: 1px solid var(--border);
+    padding: 4px 10px;
+    border-radius: 20px;
+  }
+
+  /* ---- TABS ---- */
+  .tabs {
+    display: flex;
+    gap: 6px;
+    padding: 16px 16px 0;
+  }
+  .tab {
+    flex: 1;
+    padding: 11px;
+    border-radius: 10px 10px 0 0;
+    border: 1px solid var(--border);
+    border-bottom: none;
+    background: var(--surface);
+    color: var(--muted);
+    font-family: 'DM Sans', sans-serif;
+    font-size: .85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all .2s;
+    text-align: center;
+  }
+  .tab.active {
+    background: var(--card);
+    color: var(--accent);
+    border-color: var(--accent);
+    border-bottom: 1px solid var(--card);
+    position: relative;
+    z-index: 1;
+  }
+
+  /* ---- PANELS ---- */
+  .panel {
+    display: none;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 0 0 14px 14px;
+    margin: 0 16px;
+    padding: 20px 16px;
+  }
+  .panel.active { display: block; }
+
+  /* ---- CATALOG PANEL ---- */
+  .cat-form {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 18px;
+    flex-wrap: wrap;
+  }
+  .cat-form input {
+    flex: 1;
+    min-width: 120px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 11px 14px;
+    border-radius: 10px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: .9rem;
+    outline: none;
+    transition: border-color .2s;
+  }
+  .cat-form input:focus { border-color: var(--accent); }
+  .cat-form input::placeholder { color: var(--muted); }
+  .btn-add {
+    background: var(--accent);
+    color: #0f0e0c;
+    border: none;
+    padding: 11px 20px;
+    border-radius: 10px;
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 600;
+    font-size: .9rem;
+    cursor: pointer;
+    transition: background .2s, transform .1s;
+    white-space: nowrap;
+  }
+  .btn-add:hover { background: var(--accent2); }
+  .btn-add:active { transform: scale(.97); }
+
+  .cat-list { display: flex; flex-direction: column; gap: 8px; }
+  .cat-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 14px;
+    transition: border-color .2s;
+    animation: slideIn .25s ease;
+  }
+  .cat-item:hover { border-color: var(--accent); }
+  .cat-item-left { display: flex; flex-direction: column; gap: 2px; }
+  .cat-item-name { font-weight: 500; font-size: .9rem; }
+  .cat-item-price { color: var(--accent); font-size: .82rem; font-weight: 600; }
+  .cat-item-unit { color: var(--muted); font-size: .75rem; }
+  .btn-del {
+    background: none;
+    border: 1px solid transparent;
+    color: var(--muted);
+    border-radius: 7px;
+    padding: 5px 10px;
+    cursor: pointer;
+    font-size: .8rem;
+    transition: all .2s;
+  }
+  .btn-del:hover { border-color: var(--danger); color: var(--danger); }
+
+  .empty-state {
+    text-align: center;
+    color: var(--muted);
+    font-size: .85rem;
+    padding: 30px 0;
+  }
+  .empty-icon { font-size: 2.5rem; margin-bottom: 8px; }
+
+  /* ---- SHOPPING PANEL ---- */
+  .search-wrap {
+    position: relative;
+    margin-bottom: 14px;
+  }
+  .search-wrap input {
+    width: 100%;
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    color: var(--text);
+    padding: 13px 16px;
+    border-radius: 12px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 1rem;
+    outline: none;
+    transition: border-color .2s;
+  }
+  .search-wrap input:focus { border-color: var(--accent); }
+  .search-wrap input::placeholder { color: var(--muted); }
+
+  .dropdown {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0; right: 0;
+    background: var(--surface);
+    border: 1px solid var(--accent);
+    border-radius: 12px;
+    z-index: 50;
+    max-height: 220px;
+    overflow-y: auto;
+    box-shadow: 0 8px 24px rgba(0,0,0,.5);
+  }
+  .dropdown-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    cursor: pointer;
+    border-bottom: 1px solid var(--border);
+    transition: background .15s;
+  }
+  .dropdown-item:last-child { border-bottom: none; }
+  .dropdown-item:hover { background: var(--card); }
+  .dd-name { font-weight: 500; font-size: .9rem; }
+  .dd-price { color: var(--accent); font-size: .82rem; }
+
+  /* qty + add row */
+  .qty-row {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+    align-items: center;
+  }
+  .qty-row input {
+    width: 90px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 11px 12px;
+    border-radius: 10px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: .9rem;
+    text-align: center;
+    outline: none;
+    transition: border-color .2s;
+  }
+  .qty-row input:focus { border-color: var(--accent); }
+  .selected-preview {
+    flex: 1;
+    background: var(--surface);
+    border: 1px dashed var(--border);
+    border-radius: 10px;
+    padding: 10px 14px;
+    font-size: .85rem;
+    color: var(--muted);
+  }
+  .selected-preview b { color: var(--text); }
+  .selected-preview .prix-calc { color: var(--accent); font-weight: 600; }
+
+  /* liste shopping */
+  .shop-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; }
+  .shop-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px 14px;
+    animation: slideIn .25s ease;
+  }
+  .shop-item.checked { opacity: .45; }
+  .shop-item-check {
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    border: 2px solid var(--border);
+    cursor: pointer;
+    flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    transition: all .2s;
+    background: none;
+  }
+  .shop-item-check.done {
+    background: var(--success);
+    border-color: var(--success);
+    color: white;
+    font-size: .75rem;
+  }
+  .shop-info { flex: 1; }
+  .shop-name { font-weight: 500; font-size: .9rem; }
+  .shop-sub { color: var(--muted); font-size: .78rem; margin-top: 2px; }
+  .shop-price { color: var(--accent); font-weight: 600; font-size: .9rem; }
+  .btn-rm {
+    background: none;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 1.1rem;
+    padding: 4px;
+    transition: color .2s;
+  }
+  .btn-rm:hover { color: var(--danger); }
+
+  .qty-ctrl {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .qty-ctrl button {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    width: 24px; height: 24px;
+    border-radius: 6px;
+    font-size: 1rem;
+    cursor: pointer;
+    line-height: 1;
+    transition: border-color .2s;
+  }
+  .qty-ctrl button:hover { border-color: var(--accent); color: var(--accent); }
+  .qty-ctrl span {
+    font-size: .82rem;
+    color: var(--muted);
+    min-width: 28px;
+    text-align: center;
+  }
+
+  /* TOTAL */
+  .total-bar {
+    background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%);
+    border-radius: 14px;
+    padding: 18px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 4px;
+  }
+  .total-label { font-size: .85rem; font-weight: 600; color: #0f0e0c; }
+  .total-count { font-size: .75rem; color: rgba(0,0,0,.55); margin-top: 2px; }
+  .total-amount {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.8rem;
+    color: #0f0e0c;
+    font-weight: 700;
+  }
+
+  .btn-clear {
+    width: 100%;
+    margin-top: 10px;
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    padding: 10px;
+    border-radius: 10px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: .82rem;
+    cursor: pointer;
+    transition: all .2s;
+  }
+  .btn-clear:hover { border-color: var(--danger); color: var(--danger); }
+
+  /* unit toggle */
+  .unit-toggle {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+  }
+  .unit-btn {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    padding: 6px 13px;
+    border-radius: 20px;
+    font-size: .78rem;
+    cursor: pointer;
+    transition: all .2s;
+    font-family: 'DM Sans', sans-serif;
+  }
+  .unit-btn.sel { background: var(--accent); border-color: var(--accent); color: #0f0e0c; font-weight: 600; }
+
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateY(-8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* scrollbar */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  /* ---- MODAL EDIT ---- */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.7);
+    z-index: 200;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: var(--card);
+    border: 1px solid var(--accent);
+    border-radius: 16px;
+    padding: 24px 20px;
+    width: 100%;
+    max-width: 360px;
+    animation: slideIn .2s ease;
+  }
+  .modal h3 {
+    font-family: 'Playfair Display', serif;
+    color: var(--accent);
+    font-size: 1.1rem;
+    margin-bottom: 16px;
+  }
+  .modal input {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 11px 14px;
+    border-radius: 10px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: .9rem;
+    outline: none;
+    margin-bottom: 10px;
+    transition: border-color .2s;
+  }
+  .modal input:focus { border-color: var(--accent); }
+  .modal-btns { display: flex; gap: 8px; margin-top: 6px; }
+  .btn-save {
+    flex: 1;
+    background: var(--accent);
+    color: #0f0e0c;
+    border: none;
+    padding: 11px;
+    border-radius: 10px;
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 600;
+    font-size: .9rem;
+    cursor: pointer;
+    transition: background .2s;
+  }
+  .btn-save:hover { background: var(--accent2); }
+  .btn-cancel {
+    flex: 1;
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    padding: 11px;
+    border-radius: 10px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: .9rem;
+    cursor: pointer;
+    transition: all .2s;
+  }
+  .btn-cancel:hover { border-color: var(--danger); color: var(--danger); }
+  .btn-edit {
+    background: none;
+    border: 1px solid transparent;
+    color: var(--muted);
+    border-radius: 7px;
+    padding: 5px 10px;
+    cursor: pointer;
+    font-size: .8rem;
+    transition: all .2s;
+    margin-right: 4px;
+  }
+  .btn-edit:hover { border-color: var(--accent); color: var(--accent); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🛒 Mes Courses by Ivan</h1>
+  <span id="cat-count">0 articles</span>
+</header>
+
+<div class="tabs">
+  <button class="tab active" onclick="switchTab('catalogue')">📦 Catalogue</button>
+  <button class="tab" onclick="switchTab('courses')">🛒 Ma Liste</button>
+</div>
+
+<!-- ===== CATALOGUE ===== -->
+<div class="panel active" id="panel-catalogue">
+  <div class="cat-form">
+    <input id="cat-name" type="text" placeholder="Nom de l'article" maxlength="60" />
+    <input id="cat-price" type="number" step="0.01" min="0" placeholder="Prix" style="width:90px;flex:none" />
+    <div class="unit-toggle" style="margin:0;gap:5px">
+      <button class="unit-btn sel" onclick="selUnit(this,'Carton')">Carton</button>
+      <button class="unit-btn sel" onclick="selUnit(this,'Demi')">1/2</button>
+      <button class="unit-btn sel" onclick="selUnit(this,'cart')">1/4</button>
+    </div>
+    <button class="btn-add" onclick="addCatItem()">+ Ajouter</button>
+  </div>
+  <div class="cat-list" id="cat-list">
+    <div class="empty-state"><div class="empty-icon">📋</div>Ton catalogue est vide.<br>Ajoute tes articles habituels ici.</div>
+  </div>
+</div>
+
+<!-- ===== COURSES ===== -->
+<div class="panel" id="panel-courses">
+  <div class="search-wrap">
+    <input id="shop-search" type="text" placeholder="🔍 Commence à écrire un article…" autocomplete="off" oninput="onSearch()" onkeydown="onSearchKey(event)" />
+    <div class="dropdown" id="dropdown" style="display:none"></div>
+  </div>
+
+  <div class="qty-row">
+    <input id="shop-qty" type="number" min="0.01" step="0.01" placeholder="Qté" value="1" />
+    <div class="selected-preview" id="preview">← Choisis un article</div>
+    <button class="btn-add" onclick="addToList()">Ajouter</button>
+  </div>
+
+  <div class="shop-list" id="shop-list"></div>
+
+  <div class="total-bar">
+    <div>
+      <div class="total-label">Total estimé</div>
+      <div class="total-count" id="total-count">0 article</div>
+    </div>
+    <div class="total-amount" id="total-amount">0 CFA</div>
+  </div>
+  <button class="btn-clear" onclick="clearList()">🗑 Vider la liste</button>
+</div>
+
+<!-- ===== MODAL EDIT ===== -->
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal" onclick="event.stopPropagation()">
+    <h3> Modifier l'article</h3>
+    <input id="edit-name" type="text" placeholder="Nom de l'article" maxlength="60" />
+    <input id="edit-price" type="number" step="1" min="0" placeholder="Prix (CFA)" />
+    <div class="unit-toggle" id="edit-unit-toggle" style="margin-bottom:14px">
+      <button class="unit-btn" onclick="selEditUnit(this,'Carton')">Carton</button>
+      <button class="unit-btn" onclick="selEditUnit(this,'Demi')">1/2</button>
+      <button class="unit-btn" onclick="selEditUnit(this,'unité')">unité</button>
+      
+    </div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeModal()">Annuler</button>
+      <button class="btn-save" onclick="saveEdit()">✔ Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ==================== DATA ====================
+let catalog = JSON.parse(localStorage.getItem('catalog') || '[]');
+let shopList = JSON.parse(localStorage.getItem('shopList') || '[]');
+let selectedUnit = 'unité';
+let selectedArticle = null;
+let ddIndex = -1;
+let ddItems = [];
+
+function save() {
+  localStorage.setItem('catalog', JSON.stringify(catalog));
+  localStorage.setItem('shopList', JSON.stringify(shopList));
+}
+
+// ==================== TABS ====================
+function switchTab(tab) {
+  document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', (tab==='catalogue'?0:1)===i));
+  document.getElementById('panel-catalogue').classList.toggle('active', tab==='catalogue');
+  document.getElementById('panel-courses').classList.toggle('active', tab==='courses');
+  if (tab==='courses') renderShopList();
+}
+
+// ==================== CATALOGUE ====================
+function selUnit(btn, unit) {
+  document.querySelectorAll('.unit-btn').forEach(b => b.classList.remove('sel'));
+  btn.classList.add('sel');
+  selectedUnit = unit;
+}
+
+function addCatItem() {
+  const name = document.getElementById('cat-name').value.trim();
+  const price = parseFloat(document.getElementById('cat-price').value);
+  if (!name) return shake('cat-name');
+  if (isNaN(price) || price < 0) return shake('cat-price');
+  if (catalog.find(c => c.name.toLowerCase() === name.toLowerCase())) {
+    alert('Cet article existe déjà dans le catalogue.');
+    return;
+  }
+  catalog.push({ id: Date.now(), name, price, unit: selectedUnit });
+  save();
+  document.getElementById('cat-name').value = '';
+  document.getElementById('cat-price').value = '';
+  renderCatalog();
+}
+
+function delCatItem(id) {
+  catalog = catalog.filter(c => c.id !== id);
+  save();
+  renderCatalog();
+}
+
+// ==================== EDIT MODAL ====================
+let editingId = null;
+let editUnit = 'unité';
+
+function openEdit(id) {
+  const item = catalog.find(c => c.id === id);
+  if (!item) return;
+  editingId = id;
+  editUnit = item.unit;
+  document.getElementById('edit-name').value = item.name;
+  document.getElementById('edit-price').value = item.price;
+  document.querySelectorAll('#edit-unit-toggle .unit-btn').forEach(b => {
+    b.classList.toggle('sel', b.textContent.trim() === item.unit);
+  });
+  document.getElementById('modal-overlay').classList.add('open');
+  setTimeout(() => document.getElementById('edit-name').focus(), 100);
+}
+
+function selEditUnit(btn, unit) {
+  editUnit = unit;
+  document.querySelectorAll('#edit-unit-toggle .unit-btn').forEach(b => b.classList.remove('sel'));
+  btn.classList.add('sel');
+}
+
+function closeModal() {
+  document.getElementById('modal-overlay').classList.remove('open');
+  editingId = null;
+}
+
+function saveEdit() {
+  const name = document.getElementById('edit-name').value.trim();
+  const price = parseFloat(document.getElementById('edit-price').value);
+  if (!name) return shake('edit-name');
+  if (isNaN(price) || price < 0) return shake('edit-price');
+  const dup = catalog.find(c => c.name.toLowerCase() === name.toLowerCase() && c.id !== editingId);
+  if (dup) { alert('Un autre article porte déjà ce nom.'); return; }
+  const item = catalog.find(c => c.id === editingId);
+  if (!item) return;
+  item.name = name;
+  item.price = price;
+  item.unit = editUnit;
+  save();
+  closeModal();
+  renderCatalog();
+}
+
+// Close modal on overlay click
+document.getElementById('modal-overlay').addEventListener('click', function(e) {
+  if (e.target === this) closeModal();
+});
+
+function renderCatalog() {
+  const list = document.getElementById('cat-list');
+  document.getElementById('cat-count').textContent = catalog.length + ' article' + (catalog.length!==1?'s':'');
+  if (!catalog.length) {
+    list.innerHTML = '<div class="empty-state"><div class="empty-icon">📋</div>Ton catalogue est vide.<br>Ajoute tes articles habituels ici.</div>';
+    return;
+  }
+  const sorted = [...catalog].sort((a,b) => a.name.localeCompare(b.name));
+  list.innerHTML = sorted.map(c => `
+    <div class="cat-item">
+      <div class="cat-item-left">
+        <div class="cat-item-name">${esc(c.name)}</div>
+        <div class="cat-item-price">${fmt(c.price)} CFA / <span class="cat-item-unit">${c.unit}</span></div>
+      </div>
+      <div style="display:flex;gap:4px;align-items:center">
+        <button class="btn-edit" onclick="openEdit(${c.id})"> Modifier</button>
+        <button class="btn-del" onclick="delCatItem(${c.id})">✕</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+// ==================== SHOPPING ====================
+function onSearch() {
+  const q = document.getElementById('shop-search').value.trim().toLowerCase();
+  const dd = document.getElementById('dropdown');
+  ddIndex = -1;
+  if (!q) { dd.style.display='none'; selectedArticle=null; updatePreview(); return; }
+  ddItems = catalog.filter(c => c.name.toLowerCase().includes(q));
+  if (!ddItems.length) { dd.style.display='none'; return; }
+  dd.innerHTML = ddItems.map((c,i) => `
+    <div class="dropdown-item" onmousedown="selectArticle(${i})">
+      <span class="dd-name">${highlight(c.name, q)}</span>
+      <span class="dd-price">${fmt(c.price)} CFA/${c.unit}</span>
+    </div>
+  `).join('');
+  dd.style.display = 'block';
+}
+
+function highlight(name, q) {
+  const idx = name.toLowerCase().indexOf(q);
+  if (idx < 0) return esc(name);
+  return esc(name.slice(0,idx)) + '<b style="color:var(--accent)">' + esc(name.slice(idx,idx+q.length)) + '</b>' + esc(name.slice(idx+q.length));
+}
+
+function onSearchKey(e) {
+  const dd = document.getElementById('dropdown');
+  const items = dd.querySelectorAll('.dropdown-item');
+  if (e.key === 'ArrowDown') { ddIndex = Math.min(ddIndex+1, items.length-1); highlightDD(items); e.preventDefault(); }
+  else if (e.key === 'ArrowUp') { ddIndex = Math.max(ddIndex-1, 0); highlightDD(items); e.preventDefault(); }
+  else if (e.key === 'Enter') { if (ddIndex>=0) selectArticle(ddIndex); else if(items.length===1) selectArticle(0); }
+  else if (e.key === 'Escape') { dd.style.display='none'; }
+}
+
+function highlightDD(items) {
+  items.forEach((it,i) => it.style.background = i===ddIndex ? 'var(--card)' : '');
+}
+
+function selectArticle(i) {
+  selectedArticle = ddItems[i];
+  document.getElementById('shop-search').value = selectedArticle.name;
+  document.getElementById('dropdown').style.display = 'none';
+  updatePreview();
+  document.getElementById('shop-qty').focus();
+}
+
+document.addEventListener('click', e => {
+  if (!e.target.closest('.search-wrap')) document.getElementById('dropdown').style.display='none';
+});
+
+document.getElementById('shop-qty').addEventListener('input', updatePreview);
+
+function updatePreview() {
+  const qty = parseFloat(document.getElementById('shop-qty').value) || 0;
+  const el = document.getElementById('preview');
+  if (!selectedArticle) { el.innerHTML = '← Choisis un article'; return; }
+  const total = selectedArticle.price * qty;
+  el.innerHTML = `<b>${esc(selectedArticle.name)}</b> × ${qty} ${selectedArticle.unit}<br><span class="prix-calc">${fmt(total)} CFA</span>`;
+}
+
+function addToList() {
+  if (!selectedArticle) return;
+  const qty = parseFloat(document.getElementById('shop-qty').value);
+  if (!qty || qty <= 0) return shake('shop-qty');
+  shopList.push({
+    id: Date.now(),
+    name: selectedArticle.name,
+    price: selectedArticle.price,
+    unit: selectedArticle.unit,
+    qty,
+    done: false
+  });
+  save();
+  document.getElementById('shop-search').value = '';
+  document.getElementById('shop-qty').value = '1';
+  selectedArticle = null;
+  updatePreview();
+  renderShopList();
+}
+
+function toggleDone(id) {
+  const it = shopList.find(s => s.id===id);
+  if (it) { it.done = !it.done; save(); renderShopList(); }
+}
+
+function removeShopItem(id) {
+  shopList = shopList.filter(s => s.id!==id);
+  save(); renderShopList();
+}
+
+function changeQty(id, delta) {
+  const it = shopList.find(s => s.id === id);
+  if (!it) return;
+  const newQty = Math.round((it.qty + delta) * 100) / 100;
+  if (newQty <= 0) {
+    if (confirm(`Retirer "${it.name}" de la liste ?`)) {
+      shopList = shopList.filter(s => s.id !== id);
+    }
+  } else {
+    it.qty = newQty;
+  }
+  save();
+  renderShopList();
+}
+
+function clearList() {
+  if (!shopList.length) return;
+  if (confirm('Vider toute la liste ?')) { shopList = []; save(); renderShopList(); }
+}
+
+function renderShopList() {
+  const list = document.getElementById('shop-list');
+  const undone = shopList.filter(s => !s.done);
+  const done = shopList.filter(s => s.done);
+  const ordered = [...undone, ...done];
+
+  if (!shopList.length) {
+    list.innerHTML = '<div class="empty-state"><div class="empty-icon">🛍️</div>Ta liste est vide.<br>Recherche un article ci-dessus.</div>';
+    document.getElementById('total-amount').textContent = '0 CFA';
+    document.getElementById('total-count').textContent = '0 article';
+    return;
+  }
+
+  list.innerHTML = ordered.map(s => `
+    <div class="shop-item ${s.done?'checked':''}">
+      <div class="shop-item-check ${s.done?'done':''}" onclick="toggleDone(${s.id})">${s.done?'✓':''}</div>
+      <div class="shop-info">
+        <div class="shop-name">${esc(s.name)}</div>
+        <div class="shop-sub">${fmt(s.price)} CFA / ${s.unit}</div>
+      </div>
+      <div class="qty-ctrl">
+        <button onclick="changeQty(${s.id}, -1)">−</button>
+        <span>${s.qty} ${s.unit}</span>
+        <button onclick="changeQty(${s.id}, +1)">+</button>
+      </div>
+      <div class="shop-price">${fmt(s.price * s.qty)} CFA</div>
+      <button class="btn-rm" onclick="removeShopItem(${s.id})">✕</button>
+    </div>
+  `).join('');
+
+  const total = shopList.reduce((acc,s) => acc + s.price*s.qty, 0);
+  const n = shopList.length;
+  document.getElementById('total-amount').textContent = fmt(total) + ' CFA';
+  document.getElementById('total-count').textContent = n + ' article' + (n!==1?'s':'');
+}
+
+// ==================== UTILS ====================
+function fmt(n) { return Math.round(n).toLocaleString('fr-FR'); }
+function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function shake(id) {
+  const el = document.getElementById(id);
+  el.style.borderColor = 'var(--danger)';
+  el.style.animation = 'none';
+  el.offsetHeight;
+  el.style.animation = 'shake .3s';
+  setTimeout(() => { el.style.borderColor=''; el.style.animation=''; }, 600);
+}
+
+// ==================== INIT ====================
+renderCatalog();
+renderShopList();
+
+// Keyboard shortcut: Enter in cat-name moves to price
+document.getElementById('cat-name').addEventListener('keydown', e => { if(e.key==='Enter') document.getElementById('cat-price').focus(); });
+document.getElementById('cat-price').addEventListener('keydown', e => { if(e.key==='Enter') addCatItem(); });
+</script>
+
+<style>
+@keyframes shake {
+  0%,100% { transform: translateX(0); }
+  25% { transform: translateX(-6px); }
+  75% { transform: translateX(6px); }
+}
+</style>
+
+</body>
+</html>
