@@ -194,7 +194,7 @@ function onSearch() {
   const dd = document.getElementById('dropdown');
   ddIndex = -1;
   if (!q) { dd.style.display='none'; selectedArticle=null; updatePreview(); return; }
-  ddItems = catalog.filter(c => c.name.toLowerCase().includes(q));
+  ddItems = catalog.filter(c => c.price != null && c.name.toLowerCase().includes(q));
   if (!ddItems.length) { dd.style.display='none'; return; }
   dd.innerHTML = ddItems.map((c,i) => `
     <div class="dropdown-item" onmousedown="selectArticle(${i})">
@@ -354,7 +354,7 @@ function onMerchSearch() {
   const dd = document.getElementById('merch-dropdown');
   merchDdIndex = -1;
   if (!q) { dd.style.display='none'; selectedMerchArticle=null; updateMerchPreview(); return; }
-  merchDdItems = catalog.filter(c => c.name.toLowerCase().includes(q));
+  merchDdItems = catalog.filter(c => c.sellPrice != null && c.name.toLowerCase().includes(q));
   if (!merchDdItems.length) { dd.style.display='none'; return; }
   dd.innerHTML = merchDdItems.map((c,i) => `
     <div class="dropdown-item" onmousedown="selectMerchArticle(${i})">
