@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Ma Liste de Courses</title>
-<link href="designe.css" rel="stylesheet">
+<link href="disigne.css" rel="stylesheet">
 <style>
 
 </style>
@@ -26,18 +26,25 @@
 <div class="panel active" id="panel-catalogue">
   <div class="cat-form">
     <input id="cat-name" type="text" placeholder="Nom de l'article" maxlength="60" />
-    <input id="cat-price" type="number" step="0.01" min="0" placeholder="Prix (CFA)" style="width:100px;flex:none" />
     <div class="type-toggle" id="cat-type-toggle" role="radiogroup" aria-label="Type de prix">
       <button type="button" class="type-btn sel" role="radio" aria-checked="true" data-type="achat" onclick="selCatType(this,'achat')">Achat</button>
       <button type="button" class="type-btn" role="radio" aria-checked="false" data-type="vente" onclick="selCatType(this,'vente')">Vente</button>
     </div>
-    <div class="unit-toggle" style="margin:0;gap:5px">
+    <div class="unit-toggle" id="cat-unit-toggle-achat" style="margin:0;gap:5px">
       <button class="unit-btn sel" onclick="selUnit(this,'Carton')">Carton</button>
-      <button class="unit-btn sel" onclick="selUnit(this,'Demi')">1/2</button>
-      <button class="unit-btn sel" onclick="selUnit(this,'cart')">1/4</button>
+      <button class="unit-btn" onclick="selUnit(this,'Demi')">1/2</button>
+      <button class="unit-btn" onclick="selUnit(this,'1/4')">1/4</button>
     </div>
+    <div class="unit-toggle" id="cat-unit-toggle-vente" style="margin:0;gap:5px;display:none">
+      <button class="unit-btn sel" onclick="selUnit(this,'Carton')">Carton</button>
+      <button class="unit-btn" onclick="selUnit(this,'Demi')">1/2</button>
+      <button class="unit-btn" onclick="selUnit(this,'1/4')">1/4</button>
+      <button class="unit-btn" onclick="selUnit(this,'unité')">Unité</button>
+    </div>
+    <input id="cat-price" type="number" step="0.01" min="0" placeholder="Prix (CFA)" style="width:100px;flex:none" />
     <button class="btn-add" onclick="addCatItem()">+ Ajouter</button>
   </div>
+  <div class="cat-form-hint">Ajoute chaque prix un par un : même nom d'article + emballage différent ou type différent = un prix de plus sur le même article.</div>
   <div class="cat-list" id="cat-list">
     <div class="empty-state"><div class="empty-icon">📋</div>Ton catalogue est vide.<br>Ajoute tes articles habituels ici.</div>
   </div>
@@ -50,8 +57,10 @@
     <div class="dropdown" id="dropdown" style="display:none"></div>
   </div>
 
+  <div class="unit-toggle" id="shop-unit-picker" style="display:none;margin-bottom:10px"></div>
+
   <div class="qty-row">
-    <input id="shop-qty" type="number" min="0.01" step="0.01" placeholder="Qté" value="1" />
+    <input id="shop-qty" type="number" min="1" step="1" placeholder="Qté" value="1" onkeydown="if(event.key==='Enter') addToList()" />
     <div class="selected-preview" id="preview">← Choisis un article</div>
     <button class="btn-add" onclick="addToList()">Ajouter</button>
   </div>
@@ -75,8 +84,10 @@
     <div class="dropdown" id="merch-dropdown" style="display:none"></div>
   </div>
 
+  <div class="unit-toggle" id="merch-unit-picker" style="display:none;margin-bottom:10px"></div>
+
   <div class="qty-row">
-    <input id="merch-qty" type="number" min="0.01" step="0.01" placeholder="Qté" value="1" />
+    <input id="merch-qty" type="number" min="1" step="1" placeholder="Qté" value="1" onkeydown="if(event.key==='Enter') addToSale()" />
     <div class="selected-preview" id="merch-preview">← Choisis un article</div>
     <button class="btn-add" onclick="addToSale()">Ajouter</button>
   </div>
@@ -118,20 +129,9 @@
 <!-- ===== MODAL EDIT ===== -->
 <div class="modal-overlay" id="modal-overlay">
   <div class="modal" onclick="event.stopPropagation()">
-    <h3> Modifier l'article</h3>
+    <h3>Modifier l'article</h3>
     <input id="edit-name" type="text" placeholder="Nom de l'article" maxlength="60" />
-    <input id="edit-price" type="number" step="1" min="0" placeholder="Prix (CFA)" oninput="onEditPriceInput()" />
-    <div class="type-toggle" id="edit-type-toggle" role="radiogroup" aria-label="Type de prix" style="margin-bottom:8px">
-      <button type="button" class="type-btn sel" role="radio" aria-checked="true" data-type="achat" onclick="selEditType(this,'achat')">Achat</button>
-      <button type="button" class="type-btn" role="radio" aria-checked="false" data-type="vente" onclick="selEditType(this,'vente')">Vente</button>
-    </div>
-    <div class="edit-hint" id="edit-hint"></div>
-    <div class="unit-toggle" id="edit-unit-toggle" style="margin-bottom:14px">
-      <button class="unit-btn" onclick="selEditUnit(this,'Carton')">Carton</button>
-      <button class="unit-btn" onclick="selEditUnit(this,'Demi')">1/2</button>
-      <button class="unit-btn" onclick="selEditUnit(this,'unité')">unité</button>
-      
-    </div>
+    <div class="price-grid" id="edit-price-grid"></div>
     <div class="modal-btns">
       <button class="btn-cancel" onclick="closeModal()">Annuler</button>
       <button class="btn-save" onclick="saveEdit()">✔ Enregistrer</button>

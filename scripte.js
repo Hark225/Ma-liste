@@ -1,13 +1,29 @@
 // ==================== DATA ====================
+const UNITS_ACHAT = ['Carton', 'Demi', '1/4'];           // on n'achète pas à l'unité
+const UNITS_VENTE = ['Carton', 'Demi', '1/4', 'unité'];  // mais on peut vendre à l'unité
+const ALL_UNITS = ['Carton', 'Demi', '1/4', 'unité'];
+
 let catalog = JSON.parse(localStorage.getItem('catalog') || '[]');
-catalog.forEach(c => { if (c.sellPrice === undefined) c.sellPrice = c.price; }); // anciens articles
-// Un article peut n'avoir qu'un seul des deux prix : on se rabat sur l'autre si besoin
-function buyPrice(c)  { return c.price != null ? c.price : (c.sellPrice != null ? c.sellPrice : 0); }
-function sellPriceOf(c) { return c.sellPrice != null ? c.sellPrice : (c.price != null ? c.price : 0); }
-function fmtPrice(n) { return n == null ? '—' : fmt(n); }
+
+// Migration : anciens articles { price, sellPrice, unit } -> { achat:{unit:prix}, vente:{unit:prix} }
+catalog.forEach(c => {
+  if (!c.achat || !c.vente) {
+    const achat = c.achat || {};
+    const vente = c.vente || {};
+    if (c.price != null && c.unit) achat[c.unit] = c.price;
+    if (c.sellPrice != null && c.unit) vente[c.unit] = c.sellPrice;
+    c.achat = achat;
+    c.vente = vente;
+    delete c.price;
+    delete c.sellPrice;
+    delete c.unit;
+  }
+});
+
 let shopList = JSON.parse(localStorage.getItem('shopList') || '[]');
-let selectedUnit = 'unité';
+let selectedUnit = 'Carton';
 let selectedArticle = null;
+let selectedShopUnit = null;
 let ddIndex = -1;
 let ddItems = [];
 
@@ -29,38 +45,65 @@ function switchTab(tab) {
 }
 
 // ==================== CATALOGUE ====================
-function selUnit(btn, unit) {
-  document.querySelectorAll('.unit-btn').forEach(b => b.classList.remove('sel'));
-  btn.classList.add('sel');
-  selectedUnit = unit;
-}
-
-let catPriceType = 'achat';
+let catPricetype = 'achat';
+let catDraft = {achat:{}, vente: {} };
 
 function selCatType(btn, type) {
+  commitCatDraft();                 // garde la valeur en cours avant de changer
   catPriceType = type;
   document.querySelectorAll('#cat-type-toggle .type-btn').forEach(b => {
     const on = b === btn;
     b.classList.toggle('sel', on);
     b.setAttribute('aria-checked', on);
   });
+  document.getElementById('cat-unit-toggle-achat').style.display = type === 'achat' ? 'flex' : 'none';
+  document.getElementById('cat-unit-toggle-vente').style.display = type === 'vente' ? 'flex' : 'none';
+  const activeToggle = document.getElementById(type === 'achat' ? 'cat-unit-toggle-achat' : 'cat-unit-toggle-vente');
+  activeToggle.querySelectorAll('.unit-btn').forEach((b,i) => b.classList.toggle('sel', i===0));
+  selectedUnit = 'Carton';
+  loadCatDraftValue();
   document.getElementById('cat-price').focus();
+}
+
+
+function selUnit(btn, unit) {
+  commitCatDraft();
+  btn.closest('.unit-toggle').querySelectorAll('.unit-btn').forEach(b => b.classList.remove('sel'));
+  btn.classList.add('sel');
+  selectedUnit = unit;
+  loadCatDraftValue();
+  document.getElementById('cat-price').focus();
+}
+
+function commitCatDraft() {
+  const raw = document.getElementById('cat-price').value;
+  const v = parseFloat(raw);
+  if (raw !== '' && !isNaN(v) && v >= 0) {
+    catDraft[catPriceType][selectedUnit] = v;
+  }
+}
+
+function loadCatDraftValue() {
+  const v = catDraft[catPriceType][selectedUnit];
+  document.getElementById('cat-price').value = v != null ? v : '';
 }
 
 function addCatItem() {
   const name = document.getElementById('cat-name').value.trim();
-  const value = parseFloat(document.getElementById('cat-price').value);
+  commitCatDraft();   // récupère aussi le prix affiché au moment du clic
   if (!name) return shake('cat-name');
-  if (isNaN(value) || value < 0) return shake('cat-price');
-if (catalog.find(c => c.name.toLowerCase() === name.toLowerCase() && c.unit === selectedUnit)) {
-  alert('Cet article existe déjà avec cette unité.');
-  return;
-}
-  // Le prix saisi est attribué au type choisi ; l'autre reste vide (modifiable via « Modifier »).
-  const price = catPriceType === 'achat' ? value : null;
-  const sellPrice = catPriceType === 'vente' ? value : null;
-  catalog.push({ id: Date.now(), name, price, sellPrice, unit: selectedUnit });
+  if (!Object.keys(catDraft.achat).length && !Object.keys(catDraft.vente).length) {
+    return shake('cat-price');
+  }
+  let item = catalog.find(c => c.name.toLowerCase() === name.toLowerCase());
+  if (!item) {
+    item = { id: Date.now(), name, achat: {}, vente: {} };
+    catalog.push(item);
+  }
+  Object.assign(item.achat, catDraft.achat);
+  Object.assign(item.vente, catDraft.vente);
   save();
+  catDraft = { achat: {}, vente: {} };
   document.getElementById('cat-name').value = '';
   document.getElementById('cat-price').value = '';
   renderCatalog();
@@ -74,65 +117,27 @@ function delCatItem(id) {
 
 // ==================== EDIT MODAL ====================
 let editingId = null;
-let editUnit = 'unité';
-let editPriceType = 'achat';
-let editPrices = { achat: null, vente: null };
 
 function openEdit(id) {
   const item = catalog.find(c => c.id === id);
   if (!item) return;
   editingId = id;
-  editUnit = item.unit;
-  editPrices = { achat: item.price, vente: item.sellPrice };
-  editPriceType = 'achat';
   document.getElementById('edit-name').value = item.name;
-  syncEditTypeUI();
-  document.querySelectorAll('#edit-unit-toggle .unit-btn').forEach(b => {
-    b.classList.toggle('sel', b.textContent.trim() === item.unit);
-  });
+  const grid = document.getElementById('edit-price-grid');
+  grid.innerHTML = `
+    <div class="price-grid-header"><span>Emballage</span><span>Achat</span><span>Vente</span></div>
+    ${ALL_UNITS.map(u => `
+      <div class="price-grid-row">
+        <label>${u}</label>
+        ${UNITS_ACHAT.includes(u)
+          ? `<input type="number" min="0" step="1" id="edit-achat-${u}" value="${item.achat[u] ?? ''}" placeholder="—" />`
+          : `<span class="price-grid-na">—</span>`}
+        <input type="number" min="0" step="1" id="edit-vente-${u}" value="${item.vente[u] ?? ''}" placeholder="—" />
+      </div>
+    `).join('')}
+  `;
   document.getElementById('modal-overlay').classList.add('open');
   setTimeout(() => document.getElementById('edit-name').focus(), 100);
-}
-
-// range la valeur du champ dans le type de prix actuellement sélectionné
-function commitEditPrice() {
-  const raw = document.getElementById('edit-price').value;
-  const v = parseFloat(raw);
-  editPrices[editPriceType] = (raw === '' || isNaN(v)) ? null : v;
-}
-
-function syncEditTypeUI() {
-  document.querySelectorAll('#edit-type-toggle .type-btn').forEach(b => {
-    const on = b.dataset.type === editPriceType;
-    b.classList.toggle('sel', on);
-    b.setAttribute('aria-checked', on);
-  });
-  const v = editPrices[editPriceType];
-  document.getElementById('edit-price').value = v == null ? '' : v;
-  updateEditHint();
-}
-
-function updateEditHint() {
-  document.getElementById('edit-hint').innerHTML =
-    `Achat : <b>${fmtPrice(editPrices.achat)}</b> · Vente : <b>${fmtPrice(editPrices.vente)}</b> CFA`;
-}
-
-function onEditPriceInput() {
-  commitEditPrice();
-  updateEditHint();
-}
-
-function selEditType(btn, type) {
-  commitEditPrice();
-  editPriceType = type;
-  syncEditTypeUI();
-  document.getElementById('edit-price').focus();
-}
-
-function selEditUnit(btn, unit) {
-  editUnit = unit;
-  document.querySelectorAll('#edit-unit-toggle .unit-btn').forEach(b => b.classList.remove('sel'));
-  btn.classList.add('sel');
 }
 
 function closeModal() {
@@ -142,20 +147,29 @@ function closeModal() {
 
 function saveEdit() {
   const name = document.getElementById('edit-name').value.trim();
-  commitEditPrice();
   if (!name) return shake('edit-name');
-  const { achat, vente } = editPrices;
-  if ((achat == null && vente == null) || (achat != null && achat < 0) || (vente != null && vente < 0)) {
-    return shake('edit-price');
-  }
-  const dup = catalog.find(c => c.name.toLowerCase() === name.toLowerCase() && c.unit === editUnit && c.id !== editingId);
-  if (dup) { alert('Un autre article porte déjà ce nom avec cette unité.'); return; }
+  const dup = catalog.find(c => c.name.toLowerCase() === name.toLowerCase() && c.id !== editingId);
+  if (dup) { alert('Un autre article porte déjà ce nom.'); return; }
   const item = catalog.find(c => c.id === editingId);
   if (!item) return;
+
+  const achat = {}, vente = {};
+  let hasAny = false;
+  UNITS_ACHAT.forEach(u => {
+    const raw = document.getElementById(`edit-achat-${u}`).value;
+    const v = parseFloat(raw);
+    if (raw !== '' && !isNaN(v) && v >= 0) { achat[u] = v; hasAny = true; }
+  });
+  UNITS_VENTE.forEach(u => {
+    const raw = document.getElementById(`edit-vente-${u}`).value;
+    const v = parseFloat(raw);
+    if (raw !== '' && !isNaN(v) && v >= 0) { vente[u] = v; hasAny = true; }
+  });
+  if (!hasAny) { alert('Renseigne au moins un prix.'); return; }
+
   item.name = name;
-  item.price = achat;
-  item.sellPrice = vente;
-  item.unit = editUnit;
+  item.achat = achat;
+  item.vente = vente;
   save();
   closeModal();
   renderCatalog();
@@ -166,6 +180,12 @@ document.getElementById('modal-overlay').addEventListener('click', function(e) {
   if (e.target === this) closeModal();
 });
 
+function priceLine(prices) {
+  const units = ALL_UNITS.filter(u => prices[u] != null);
+  if (!units.length) return '';
+  return units.map(u => `${u} ${fmt(prices[u])}`).join(' · ');
+}
+
 function renderCatalog() {
   const list = document.getElementById('cat-list');
   document.getElementById('cat-count').textContent = catalog.length + ' article' + (catalog.length!==1?'s':'');
@@ -174,32 +194,39 @@ function renderCatalog() {
     return;
   }
   const sorted = [...catalog].sort((a,b) => a.name.localeCompare(b.name));
-  list.innerHTML = sorted.map(c => `
+  list.innerHTML = sorted.map(c => {
+    const achatLine = priceLine(c.achat);
+    const venteLine = priceLine(c.vente);
+    return `
     <div class="cat-item">
       <div class="cat-item-left">
         <div class="cat-item-name">${esc(c.name)}</div>
-        <div class="cat-item-price">${[c.price != null ? 'Achat ' + fmt(c.price) : '', c.sellPrice != null ? 'Vente ' + fmt(c.sellPrice) : ''].filter(Boolean).join(' / ')} CFA <span class="cat-item-unit">/ ${c.unit}</span></div>
+        <div class="cat-item-price">
+          ${achatLine ? `Achat : ${achatLine} CFA` : '<span style="color:var(--muted)">Aucun prix d\u2019achat</span>'}<br>
+          ${venteLine ? `Vente : ${venteLine} CFA` : '<span style="color:var(--muted)">Aucun prix de vente</span>'}
+        </div>
       </div>
       <div style="display:flex;gap:4px;align-items:center">
         <button class="btn-edit" onclick="openEdit(${c.id})"> Modifier</button>
         <button class="btn-del" onclick="delCatItem(${c.id})">✕</button>
       </div>
     </div>
-  `).join('');
+  `;
+  }).join('');
 }
 
-// ==================== SHOPPING ====================
+// ==================== SHOPPING (ACHAT) ====================
 function onSearch() {
   const q = document.getElementById('shop-search').value.trim().toLowerCase();
   const dd = document.getElementById('dropdown');
   ddIndex = -1;
-  if (!q) { dd.style.display='none'; selectedArticle=null; updatePreview(); return; }
-  ddItems = catalog.filter(c => c.price != null && c.name.toLowerCase().includes(q));
+  if (!q) { dd.style.display='none'; selectedArticle=null; selectedShopUnit=null; renderShopUnitPicker(); updatePreview(); return; }
+  ddItems = catalog.filter(c => c.name.toLowerCase().includes(q) && Object.keys(c.achat).length > 0);
   if (!ddItems.length) { dd.style.display='none'; return; }
   dd.innerHTML = ddItems.map((c,i) => `
     <div class="dropdown-item" onmousedown="selectArticle(${i})">
       <span class="dd-name">${highlight(c.name, q)}</span>
-      <span class="dd-price">${fmt(buyPrice(c))} CFA/${c.unit}</span>
+      <span class="dd-price">${priceLine(c.achat)} CFA</span>
     </div>
   `).join('');
   dd.style.display = 'block';
@@ -226,10 +253,27 @@ function highlightDD(items) {
 
 function selectArticle(i) {
   selectedArticle = ddItems[i];
+  selectedShopUnit = ALL_UNITS.find(u => selectedArticle.achat[u] != null) || null;
   document.getElementById('shop-search').value = selectedArticle.name;
   document.getElementById('dropdown').style.display = 'none';
+  renderShopUnitPicker();
   updatePreview();
   document.getElementById('shop-qty').focus();
+}
+
+function renderShopUnitPicker() {
+  const el = document.getElementById('shop-unit-picker');
+  if (!selectedArticle) { el.innerHTML = ''; el.style.display = 'none'; return; }
+  const units = ALL_UNITS.filter(u => selectedArticle.achat[u] != null);
+  if (units.length <= 1) { el.innerHTML = ''; el.style.display = 'none'; return; }
+  el.style.display = 'flex';
+  el.innerHTML = units.map(u => `<button type="button" class="unit-btn ${u===selectedShopUnit?'sel':''}" onclick="pickShopUnit('${u}')">${u}</button>`).join('');
+}
+
+function pickShopUnit(u) {
+  selectedShopUnit = u;
+  renderShopUnitPicker();
+  updatePreview();
 }
 
 document.addEventListener('click', e => {
@@ -245,20 +289,20 @@ document.getElementById('merch-qty').addEventListener('input', updateMerchPrevie
 function updatePreview() {
   const qty = parseFloat(document.getElementById('shop-qty').value) || 0;
   const el = document.getElementById('preview');
-  if (!selectedArticle) { el.innerHTML = '← Choisis un article'; return; }
-  const total = buyPrice(selectedArticle) * qty;
-  el.innerHTML = `<b>${esc(selectedArticle.name)}</b> × ${qty} ${selectedArticle.unit}<br><span class="prix-calc">${fmt(total)} CFA</span>`;
+  if (!selectedArticle || !selectedShopUnit) { el.innerHTML = '← Choisis un article'; return; }
+  const total = selectedArticle.achat[selectedShopUnit] * qty;
+  el.innerHTML = `<b>${esc(selectedArticle.name)}</b> × ${qty} ${selectedShopUnit}<br><span class="prix-calc">${fmt(total)} CFA</span>`;
 }
 
 function addToList() {
-  if (!selectedArticle) return;
+  if (!selectedArticle || !selectedShopUnit) return;
   const qty = parseFloat(document.getElementById('shop-qty').value);
   if (!qty || qty <= 0) return shake('shop-qty');
   shopList.push({
     id: Date.now(),
     name: selectedArticle.name,
-    price: buyPrice(selectedArticle),
-    unit: selectedArticle.unit,
+    price: selectedArticle.achat[selectedShopUnit],
+    unit: selectedShopUnit,
     qty,
     done: false
   });
@@ -266,6 +310,8 @@ function addToList() {
   document.getElementById('shop-search').value = '';
   document.getElementById('shop-qty').value = '1';
   selectedArticle = null;
+  selectedShopUnit = null;
+  renderShopUnitPicker();
   updatePreview();
   renderShopList();
 }
@@ -340,6 +386,7 @@ function renderShopList() {
 let saleList = JSON.parse(localStorage.getItem('saleList') || '[]');
 let invoices = JSON.parse(localStorage.getItem('invoices') || '[]');
 let selectedMerchArticle = null;
+let selectedMerchUnit = null;
 let merchDdIndex = -1;
 let merchDdItems = [];
 
@@ -353,13 +400,13 @@ function onMerchSearch() {
   const q = document.getElementById('merch-search').value.trim().toLowerCase();
   const dd = document.getElementById('merch-dropdown');
   merchDdIndex = -1;
-  if (!q) { dd.style.display='none'; selectedMerchArticle=null; updateMerchPreview(); return; }
-  merchDdItems = catalog.filter(c => c.sellPrice != null && c.name.toLowerCase().includes(q));
+  if (!q) { dd.style.display='none'; selectedMerchArticle=null; selectedMerchUnit=null; renderMerchUnitPicker(); updateMerchPreview(); return; }
+  merchDdItems = catalog.filter(c => c.name.toLowerCase().includes(q) && Object.keys(c.vente).length > 0);
   if (!merchDdItems.length) { dd.style.display='none'; return; }
   dd.innerHTML = merchDdItems.map((c,i) => `
     <div class="dropdown-item" onmousedown="selectMerchArticle(${i})">
       <span class="dd-name">${highlight(c.name, q)}</span>
-      <span class="dd-price">${fmt(sellPriceOf(c))} CFA/${c.unit}</span>
+      <span class="dd-price">${priceLine(c.vente)} CFA</span>
     </div>
   `).join('');
   dd.style.display = 'block';
@@ -380,36 +427,55 @@ function highlightMerchDD(items) {
 
 function selectMerchArticle(i) {
   selectedMerchArticle = merchDdItems[i];
+  selectedMerchUnit = ALL_UNITS.find(u => selectedMerchArticle.vente[u] != null) || null;
   document.getElementById('merch-search').value = selectedMerchArticle.name;
   document.getElementById('merch-dropdown').style.display = 'none';
+  renderMerchUnitPicker();
   updateMerchPreview();
   document.getElementById('merch-qty').focus();
+}
+
+function renderMerchUnitPicker() {
+  const el = document.getElementById('merch-unit-picker');
+  if (!selectedMerchArticle) { el.innerHTML = ''; el.style.display = 'none'; return; }
+  const units = ALL_UNITS.filter(u => selectedMerchArticle.vente[u] != null);
+  if (units.length <= 1) { el.innerHTML = ''; el.style.display = 'none'; return; }
+  el.style.display = 'flex';
+  el.innerHTML = units.map(u => `<button type="button" class="unit-btn ${u===selectedMerchUnit?'sel':''}" onclick="pickMerchUnit('${u}')">${u}</button>`).join('');
+}
+
+function pickMerchUnit(u) {
+  selectedMerchUnit = u;
+  renderMerchUnitPicker();
+  updateMerchPreview();
 }
 
 function updateMerchPreview() {
   const qty = parseFloat(document.getElementById('merch-qty').value) || 0;
   const el = document.getElementById('merch-preview');
-  if (!selectedMerchArticle) { el.innerHTML = '← Choisis un article'; return; }
-  const total = sellPriceOf(selectedMerchArticle) * qty;
-  el.innerHTML = `<b>${esc(selectedMerchArticle.name)}</b> × ${qty} ${selectedMerchArticle.unit}<br><span class="prix-calc">${fmt(total)} CFA</span>`;
+  if (!selectedMerchArticle || !selectedMerchUnit) { el.innerHTML = '← Choisis un article'; return; }
+  const total = selectedMerchArticle.vente[selectedMerchUnit] * qty;
+  el.innerHTML = `<b>${esc(selectedMerchArticle.name)}</b> × ${qty} ${selectedMerchUnit}<br><span class="prix-calc">${fmt(total)} CFA</span>`;
 }
 
 // ---- panier de vente en cours ----
 function addToSale() {
-  if (!selectedMerchArticle) return;
+  if (!selectedMerchArticle || !selectedMerchUnit) return;
   const qty = parseFloat(document.getElementById('merch-qty').value);
   if (!qty || qty <= 0) return shake('merch-qty');
   saleList.push({
     id: Date.now(),
     name: selectedMerchArticle.name,
-    price: sellPriceOf(selectedMerchArticle),
-    unit: selectedMerchArticle.unit,
+    price: selectedMerchArticle.vente[selectedMerchUnit],
+    unit: selectedMerchUnit,
     qty
   });
   saveSale();
   document.getElementById('merch-search').value = '';
   document.getElementById('merch-qty').value = '1';
   selectedMerchArticle = null;
+  selectedMerchUnit = null;
+  renderMerchUnitPicker();
   updateMerchPreview();
   renderSaleList();
 }
