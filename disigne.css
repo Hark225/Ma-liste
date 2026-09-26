@@ -592,3 +592,11 @@
     font-size: .85rem;
     text-align: center;
   }
+
+  /* ---- LOGO SUR LA FACTURE (imprimé aussi) ---- */
+  .invoice-content .inv-logo {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.1rem;
+    color: var(--accent);
+    margin-bottom: 4px;
+  }

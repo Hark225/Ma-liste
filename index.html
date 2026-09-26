@@ -60,7 +60,7 @@
   <div class="unit-toggle" id="shop-unit-picker" style="display:none;margin-bottom:10px"></div>
 
   <div class="qty-row">
-    <input id="shop-qty" type="number" min="1" step="1" placeholder="Qté" value="1" onkeydown="if(event.key==='Enter') addToList()" />
+    <input id="shop-qty" type="number" min="0.01" step="0.01" placeholder="Qté" value="1" />
     <div class="selected-preview" id="preview">← Choisis un article</div>
     <button class="btn-add" onclick="addToList()">Ajouter</button>
   </div>
@@ -87,7 +87,7 @@
   <div class="unit-toggle" id="merch-unit-picker" style="display:none;margin-bottom:10px"></div>
 
   <div class="qty-row">
-    <input id="merch-qty" type="number" min="1" step="1" placeholder="Qté" value="1" onkeydown="if(event.key==='Enter') addToSale()" />
+    <input id="merch-qty" type="number" min="0.01" step="0.01" placeholder="Qté" value="1" />
     <div class="selected-preview" id="merch-preview">← Choisis un article</div>
     <button class="btn-add" onclick="addToSale()">Ajouter</button>
   </div>
@@ -139,6 +139,8 @@
   </div>
 </div>
 
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-database-compat.js"></script>
 <script src="scripte.js"></script>
 
 <style>

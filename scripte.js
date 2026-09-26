@@ -1,35 +1,48 @@
+// ==================== FIREBASE ====================
+// Remplace les valeurs ci-dessous par celles de TON projet Firebase
+// (Console Firebase > icône ⚙️ > Paramètres du projet > tes applications > SDK setup).
+const firebaseConfig = {
+  apiKey: "AIzaSyC-Q5iivpBfV4Q3SRvYZU84Z_HTwk9Ocg4",
+  authDomain: "ma-liste-de-course-747c0.firebaseapp.com",
+  databaseURL: "https://ma-liste-de-course-747c0-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "ma-liste-de-course-747c0",
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
 // ==================== DATA ====================
 const UNITS_ACHAT = ['Carton', 'Demi', '1/4'];           // on n'achète pas à l'unité
 const UNITS_VENTE = ['Carton', 'Demi', '1/4', 'unité'];  // mais on peut vendre à l'unité
 const ALL_UNITS = ['Carton', 'Demi', '1/4', 'unité'];
 
-let catalog = JSON.parse(localStorage.getItem('catalog') || '[]');
-
-// Migration : anciens articles { price, sellPrice, unit } -> { achat:{unit:prix}, vente:{unit:prix} }
-catalog.forEach(c => {
-  if (!c.achat || !c.vente) {
-    const achat = c.achat || {};
-    const vente = c.vente || {};
-    if (c.price != null && c.unit) achat[c.unit] = c.price;
-    if (c.sellPrice != null && c.unit) vente[c.unit] = c.sellPrice;
-    c.achat = achat;
-    c.vente = vente;
-    delete c.price;
-    delete c.sellPrice;
-    delete c.unit;
-  }
-});
-
-let shopList = JSON.parse(localStorage.getItem('shopList') || '[]');
+let catalog = [];
+let shopList = [];
 let selectedUnit = 'Carton';
 let selectedArticle = null;
 let selectedShopUnit = null;
 let ddIndex = -1;
 let ddItems = [];
 
+// Migration : anciens articles { price, sellPrice, unit } -> { achat:{unit:prix}, vente:{unit:prix} }
+function migrateCatalog() {
+  catalog.forEach(c => {
+    if (!c.achat || !c.vente) {
+      const achat = c.achat || {};
+      const vente = c.vente || {};
+      if (c.price != null && c.unit) achat[c.unit] = c.price;
+      if (c.sellPrice != null && c.unit) vente[c.unit] = c.sellPrice;
+      c.achat = achat;
+      c.vente = vente;
+      delete c.price;
+      delete c.sellPrice;
+      delete c.unit;
+    }
+  });
+}
+
 function save() {
-  localStorage.setItem('catalog', JSON.stringify(catalog));
-  localStorage.setItem('shopList', JSON.stringify(shopList));
+  db.ref('catalog').set(catalog);
+  db.ref('shopList').set(shopList);
 }
 
 // ==================== TABS ====================
@@ -45,8 +58,8 @@ function switchTab(tab) {
 }
 
 // ==================== CATALOGUE ====================
-let catPricetype = 'achat';
-let catDraft = {achat:{}, vente: {} };
+let catPriceType = 'achat';
+let catDraft = { achat: {}, vente: {} };
 
 function selCatType(btn, type) {
   commitCatDraft();                 // garde la valeur en cours avant de changer
@@ -383,16 +396,16 @@ function renderShopList() {
 }
 
 // ==================== COMMERÇANT (VENTE) ====================
-let saleList = JSON.parse(localStorage.getItem('saleList') || '[]');
-let invoices = JSON.parse(localStorage.getItem('invoices') || '[]');
+let saleList = [];
+let invoices = [];
 let selectedMerchArticle = null;
 let selectedMerchUnit = null;
 let merchDdIndex = -1;
 let merchDdItems = [];
 
 function saveSale() {
-  localStorage.setItem('saleList', JSON.stringify(saleList));
-  localStorage.setItem('invoices', JSON.stringify(invoices));
+  db.ref('saleList').set(saleList);
+  db.ref('invoices').set(invoices);
 }
 
 // ---- recherche (même logique que l'onglet Ma Liste, sur le même catalogue) ----
@@ -565,11 +578,14 @@ function clearSale() {
   }
 }
 
+
 // ---- facture ----
+let invoiceSeq = 0;
+
 function nextInvoiceNumber() {
-  let n = parseInt(localStorage.getItem('invoiceSeq') || '0', 10) + 1;
-  localStorage.setItem('invoiceSeq', String(n));
-  return 'F-' + String(n).padStart(5, '0');
+  invoiceSeq++;
+  db.ref('invoiceSeq').set(invoiceSeq);
+  return 'F-' + String(invoiceSeq).padStart(5, '0');
 }
 
 function validateSale() {
@@ -609,7 +625,8 @@ function showInvoice(invoice) {
     </tr>
   `).join('');
   document.getElementById('invoice-content').innerHTML = `
-    <div class="inv-meta">Mes Courses by Ivan — ${d.toLocaleDateString('fr-FR')} ${d.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'})}</div>
+    <div class="inv-logo">🛒 Mes Courses by Ivan</div>
+    <div class="inv-meta">${d.toLocaleDateString('fr-FR')} ${d.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'})}</div>
     <table>
       <thead><tr><th>Article</th><th>Qté</th><th>Total</th></tr></thead>
       <tbody>${rows}</tbody>
@@ -647,11 +664,29 @@ function shake(id) {
   setTimeout(() => { el.style.borderColor=''; el.style.animation=''; }, 600);
 }
 
-// ==================== INIT ====================
-renderCatalog();
-renderShopList();
-renderSaleList();
+// ==================== INIT (synchronisation Firebase) ====================
+// Chaque appareil écoute les mêmes données : dès qu'un appareil modifie quelque chose,
+// tous les autres reçoivent la mise à jour automatiquement, sans recharger la page.
+db.ref('catalog').on('value', snap => {
+  catalog = snap.val() || [];
+  migrateCatalog();
+  renderCatalog();
+});
+db.ref('shopList').on('value', snap => {
+  shopList = snap.val() || [];
+  renderShopList();
+});
+db.ref('saleList').on('value', snap => {
+  saleList = snap.val() || [];
+  renderSaleList();
+});
+db.ref('invoices').on('value', snap => {
+  invoices = snap.val() || [];
+});
+db.ref('invoiceSeq').on('value', snap => {
+  invoiceSeq = snap.val() || 0;
+});
 
-// Keyboard shortcut: Enter in cat-name moves to price
+// Raccourcis clavier
 document.getElementById('cat-name').addEventListener('keydown', e => { if(e.key==='Enter') document.getElementById('cat-price').focus(); });
 document.getElementById('cat-price').addEventListener('keydown', e => { if(e.key==='Enter') addCatItem(); });
