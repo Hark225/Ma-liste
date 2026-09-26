@@ -11,9 +11,12 @@ firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
 // ==================== DATA ====================
-const UNITS_ACHAT = ['Carton', 'Demi', '1/4'];           // on n'achète pas à l'unité
-const UNITS_VENTE = ['Carton', 'Demi', '1/4', 'unité'];  // mais on peut vendre à l'unité
-const ALL_UNITS = ['Carton', 'Demi', '1/4', 'unité'];
+const UNITS_ACHAT = ['Carton', 'Demi', '1-4'];           // on n'achète pas à l'unité
+const UNITS_VENTE = ['Carton', 'Demi', '1-4', 'unité'];  // mais on peut vendre à l'unité
+const ALL_UNITS = ['Carton', 'Demi', '1-4', 'unité'];
+
+// "1-4" est la clé interne (Firebase interdit "/" dans les clés) ; on affiche "1/4" à l'écran.
+function unitLabel(u) { return u === '1-4' ? '1/4' : u; }
 
 let catalog = [];
 let shopList = [];
@@ -26,6 +29,13 @@ let ddItems = [];
 // Migration : anciens articles { price, sellPrice, unit } -> { achat:{unit:prix}, vente:{unit:prix} }
 function migrateCatalog() {
   catalog.forEach(c => {
+    ['achat', 'vente'].forEach(t => {
+      if (c[t] && c[t]['1/4'] != null) {
+        c[t]['1-4'] = c[t]['1/4'];
+        delete c[t]['1/4'];
+      }
+    });
+    if (c.unit === '1/4') c.unit = '1-4';
     if (!c.achat || !c.vente) {
       const achat = c.achat || {};
       const vente = c.vente || {};
@@ -141,7 +151,7 @@ function openEdit(id) {
     <div class="price-grid-header"><span>Emballage</span><span>Achat</span><span>Vente</span></div>
     ${ALL_UNITS.map(u => `
       <div class="price-grid-row">
-        <label>${u}</label>
+        <label>${unitLabel(u)}</label>
         ${UNITS_ACHAT.includes(u)
           ? `<input type="number" min="0" step="1" id="edit-achat-${u}" value="${item.achat[u] ?? ''}" placeholder="—" />`
           : `<span class="price-grid-na">—</span>`}
@@ -196,7 +206,7 @@ document.getElementById('modal-overlay').addEventListener('click', function(e) {
 function priceLine(prices) {
   const units = ALL_UNITS.filter(u => prices[u] != null);
   if (!units.length) return '';
-  return units.map(u => `${u} ${fmt(prices[u])}`).join(' · ');
+  return units.map(u => `${unitLabel(u)} ${fmt(prices[u])}`).join(' · ');
 }
 
 function renderCatalog() {
@@ -280,7 +290,7 @@ function renderShopUnitPicker() {
   const units = ALL_UNITS.filter(u => selectedArticle.achat[u] != null);
   if (units.length <= 1) { el.innerHTML = ''; el.style.display = 'none'; return; }
   el.style.display = 'flex';
-  el.innerHTML = units.map(u => `<button type="button" class="unit-btn ${u===selectedShopUnit?'sel':''}" onclick="pickShopUnit('${u}')">${u}</button>`).join('');
+  el.innerHTML = units.map(u => `<button type="button" class="unit-btn ${u===selectedShopUnit?'sel':''}" onclick="pickShopUnit('${u}')">${unitLabel(u)}</button>`).join('');
 }
 
 function pickShopUnit(u) {
@@ -304,7 +314,7 @@ function updatePreview() {
   const el = document.getElementById('preview');
   if (!selectedArticle || !selectedShopUnit) { el.innerHTML = '← Choisis un article'; return; }
   const total = selectedArticle.achat[selectedShopUnit] * qty;
-  el.innerHTML = `<b>${esc(selectedArticle.name)}</b> × ${qty} ${selectedShopUnit}<br><span class="prix-calc">${fmt(total)} CFA</span>`;
+  el.innerHTML = `<b>${esc(selectedArticle.name)}</b> × ${qty} ${unitLabel(selectedShopUnit)}<br><span class="prix-calc">${fmt(total)} CFA</span>`;
 }
 
 function addToList() {
@@ -377,11 +387,11 @@ function renderShopList() {
       <div class="shop-item-check ${s.done?'done':''}" onclick="toggleDone(${s.id})">${s.done?'✓':''}</div>
       <div class="shop-info">
         <div class="shop-name">${esc(s.name)}</div>
-        <div class="shop-sub">${fmt(s.price)} CFA / ${s.unit}</div>
+        <div class="shop-sub">${fmt(s.price)} CFA / ${unitLabel(s.unit)}</div>
       </div>
       <div class="qty-ctrl">
         <button onclick="changeQty(${s.id}, -1)">−</button>
-        <span>${s.qty} ${s.unit}</span>
+        <span>${s.qty} ${unitLabel(s.unit)}</span>
         <button onclick="changeQty(${s.id}, +1)">+</button>
       </div>
       <div class="shop-price">${fmt(s.price * s.qty)} CFA</div>
@@ -454,7 +464,7 @@ function renderMerchUnitPicker() {
   const units = ALL_UNITS.filter(u => selectedMerchArticle.vente[u] != null);
   if (units.length <= 1) { el.innerHTML = ''; el.style.display = 'none'; return; }
   el.style.display = 'flex';
-  el.innerHTML = units.map(u => `<button type="button" class="unit-btn ${u===selectedMerchUnit?'sel':''}" onclick="pickMerchUnit('${u}')">${u}</button>`).join('');
+  el.innerHTML = units.map(u => `<button type="button" class="unit-btn ${u===selectedMerchUnit?'sel':''}" onclick="pickMerchUnit('${u}')">${unitLabel(u)}</button>`).join('');
 }
 
 function pickMerchUnit(u) {
@@ -468,7 +478,7 @@ function updateMerchPreview() {
   const el = document.getElementById('merch-preview');
   if (!selectedMerchArticle || !selectedMerchUnit) { el.innerHTML = '← Choisis un article'; return; }
   const total = selectedMerchArticle.vente[selectedMerchUnit] * qty;
-  el.innerHTML = `<b>${esc(selectedMerchArticle.name)}</b> × ${qty} ${selectedMerchUnit}<br><span class="prix-calc">${fmt(total)} CFA</span>`;
+  el.innerHTML = `<b>${esc(selectedMerchArticle.name)}</b> × ${qty} ${unitLabel(selectedMerchUnit)}<br><span class="prix-calc">${fmt(total)} CFA</span>`;
 }
 
 // ---- panier de vente en cours ----
@@ -525,11 +535,11 @@ function renderSaleList() {
       <div class="shop-item">
         <div class="shop-info">
           <div class="shop-name">${esc(s.name)}</div>
-          <div class="shop-sub">${fmt(s.price)} CFA / ${s.unit}</div>
+          <div class="shop-sub">${fmt(s.price)} CFA / ${unitLabel(s.unit)}</div>
         </div>
         <div class="qty-ctrl">
           <button onclick="changeMerchQty(${s.id}, -1)">−</button>
-          <span>${s.qty} ${s.unit}</span>
+          <span>${s.qty} ${unitLabel(s.unit)}</span>
           <button onclick="changeMerchQty(${s.id}, +1)">+</button>
         </div>
         <div class="shop-price">${fmt(s.price * s.qty)} CFA</div>
@@ -619,7 +629,7 @@ function showInvoice(invoice) {
   const d = new Date(invoice.date);
   const rows = invoice.items.map(it => `
     <tr>
-      <td>${esc(it.name)}<br><span style="color:var(--muted);font-size:.72rem">${fmt(it.price)} CFA/${it.unit}</span></td>
+      <td>${esc(it.name)}<br><span style="color:var(--muted);font-size:.72rem">${fmt(it.price)} CFA/${unitLabel(it.unit)}</span></td>
       <td>${it.qty}</td>
       <td>${fmt(it.price * it.qty)} CFA</td>
     </tr>
